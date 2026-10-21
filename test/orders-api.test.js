@@ -105,4 +105,59 @@ describe("Orders API contract", () => {
     assert.equal(response.status, 404);
     assert.equal(body.error.code, "ORDER_NOT_FOUND");
   });
+
+  test("returns 404 when deleting an unknown order", async () => {
+    const response = await request("/orders/ord-does-not-exist", {
+      method: "DELETE",
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.equal(body.error.code, "ORDER_NOT_FOUND");
+  });
+
+  test("rejects invalid items with 400 and per-item details", async () => {
+    const response = await request("/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        customerName: "Alex",
+        items: [
+          { name: " ", quantity: 1, price: 10 },
+          { name: "Cable", quantity: 0, price: 5 },
+          { name: "Mouse", quantity: 1, price: "5" },
+          null,
+        ],
+      }),
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(body.error.code, "VALIDATION_ERROR");
+    assert.deepEqual(body.error.details, [
+      "items[0].name is required",
+      "items[1].quantity must be greater than zero",
+      "items[2].price must be greater than zero",
+      "items[3] must be an object",
+    ]);
+  });
+
+  test("distinguishes malformed JSON from validation failures", async () => {
+    const response = await request("/orders", {
+      method: "POST",
+      body: "{ not json",
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.equal(body.error.code, "VALIDATION_ERROR");
+    assert.equal(body.error.message, "Invalid JSON body");
+  });
+
+  test("returns 404 for an unknown route", async () => {
+    const response = await request("/unknown");
+    const body = await response.json();
+
+    assert.equal(response.status, 404);
+    assert.equal(body.error.code, "ROUTE_NOT_FOUND");
+  });
 });
